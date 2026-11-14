@@ -1,1 +1,48 @@
 
+name: Liderakademi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Node kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Java kur
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: ZIP dosyasını aç
+        run: unzip -o liderakademi-android-proje.zip -d proje
+
+      - name: APK oluştur
+        working-directory: proje/liderakademi-android
+        run: |
+          npm install
+          npm run build
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: APK dosyasını yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Liderakademi-APK
+          path: proje/liderakademi-android/android/app/build/outputs/apk/debug/app-debug.apk
+          
