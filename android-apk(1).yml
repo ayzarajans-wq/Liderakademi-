@@ -1,0 +1,72 @@
+name: Liderakademi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Node kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Proje ZIP dosyasini ac
+        run: |
+          mkdir -p proje
+          unzip -o liderakademi-android-proje.zip -d proje
+
+      - name: Proje klasorunu bul
+        run: |
+          FILE=$(find proje -name package.json -not -path '*/node_modules/*' -print -quit)
+          if [ -z "$FILE" ]; then
+            echo "HATA: ZIP icinde package.json bulunamadi"
+            exit 1
+          fi
+          DIR=$(dirname "$FILE")
+          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "Proje bulundu: $DIR"
+
+      - name: Paketleri yukle
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm install
+
+      - name: Web uygulamasini derle
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run build
+
+      - name: Android projesini hazirla
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if [ ! -f capacitor.config.json ]; then
+            echo "HATA: capacitor.config.json bulunamadi"
+            exit 1
+          fi
+          npx cap add android
+          npx cap sync android
+
+      - name: APK derle
+        working-directory: ${{ env.PROJECT_DIR }}/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: APK dosyasini yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Liderakademi-APK
+          path: ${{ env.PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
